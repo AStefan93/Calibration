@@ -5,12 +5,13 @@ camera calibration for distorted images with chess board samples
 reads distorted images, calculates the calibration and write undistorted images
 
 usage:
-    calibrate.py [--debug <output path>] [--square_size] [<image mask>]
+    calibrate.py [--debug <output path>] [--square_size] [<image mask>] [--camera true/false]
 
 default values:
     --debug:    ./output/
     --square_size: 1.0
     <image mask> defaults to ../data/left*.jpg
+    --camera 1 (true)
 '''
 
 # Python 2/3 compatibility
@@ -35,7 +36,7 @@ if __name__ == '__main__':
     args.setdefault('--debug', './output/')
     args.setdefault('--square_size', 1.0)
     args.setdefault('--threads', 4)
-    args.setdefault('--camera', 0)
+    args.setdefault('--camera', 1)
     if not img_mask:
         img_mask = '../data/left??.jpg'  # default
     else:
@@ -54,12 +55,32 @@ if __name__ == '__main__':
 
     obj_points = []
     img_points = []
-    if args.get('camera'):
+    if args.get('--camera'):
         cap = cv.VideoCapture(0)
         while(True):
            img, frame = cap.read()
+#           img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
             
+           found = 0
+#           found, corners = cv.findChessboardCorners(img, pattern_size)
+           if found:
+               term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
+               cv.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
+               vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+               cv.drawChessboardCorners(vis, pattern_size, corners, found)
+           else:
+               vis = img;
 
+           cv.imshow('image',vis)
+           cv.waitKey(30)
+
+#           if debug_dir:
+#               vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+#               cv.drawChessboardCorners(vis, pattern_size, corners, found)
+#               _path, name, _ext = splitfn(fn)
+#               outfile = os.path.join(debug_dir, name + '_chess.png')
+#               cv.imwrite(outfile, vis)
+#
     else:    
         h, w = cv.imread(img_names[0], cv.IMREAD_GRAYSCALE).shape[:2]  # TODO: use imquery call to retrieve results
 
