@@ -55,32 +55,28 @@ if __name__ == '__main__':
 
     obj_points = []
     img_points = []
+    name = 0
     if args.get('--camera'):
         cap = cv.VideoCapture(0)
         while(True):
-           img, frame = cap.read()
-#           img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+           ret,img = cap.read()
+           img = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
             
-           found = 0
-#           found, corners = cv.findChessboardCorners(img, pattern_size)
+           found, corners = cv.findChessboardCorners(img, pattern_size)
            if found:
                term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
                cv.cornerSubPix(img, corners, (5, 5), (-1, -1), term)
                vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
                cv.drawChessboardCorners(vis, pattern_size, corners, found)
+               name = name + 1
+               outfile = os.path.join(debug_dir, str(name) + '_chess.png')
+               cv.imwrite(outfile, vis)
            else:
                vis = img;
 
            cv.imshow('image',vis)
-           cv.waitKey(30)
+           cv.waitKey(10)
 
-#           if debug_dir:
-#               vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
-#               cv.drawChessboardCorners(vis, pattern_size, corners, found)
-#               _path, name, _ext = splitfn(fn)
-#               outfile = os.path.join(debug_dir, name + '_chess.png')
-#               cv.imwrite(outfile, vis)
-#
     else:    
         h, w = cv.imread(img_names[0], cv.IMREAD_GRAYSCALE).shape[:2]  # TODO: use imquery call to retrieve results
 
