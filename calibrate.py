@@ -17,6 +17,11 @@ default values:
 # Python 2/3 compatibility
 from __future__ import print_function
 
+# import the necessary packages
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+import time
+
 import numpy as np
 import cv2 as cv
 
@@ -31,12 +36,13 @@ if __name__ == '__main__':
     import getopt
     from glob import glob
 
-    args, img_mask = getopt.getopt(sys.argv[1:], '', ['debug=', 'square_size=', 'threads=', 'camera='])
+    args, img_mask = getopt.getopt(sys.argv[1:], '', ['debug=', 'square_size=', 'threads=', 'camera=', 'raspberry='])
     args = dict(args)
     args.setdefault('--debug', './output/')
     args.setdefault('--square_size', 1.0)
     args.setdefault('--threads', 4)
     args.setdefault('--camera', 1)
+    args.setdefault('--raspberry', 0)
     if not img_mask:
         img_mask = './chessboard/*.png'  # default
     else:
@@ -56,31 +62,75 @@ if __name__ == '__main__':
     obj_points = []
     img_points = []
     name = 0
+    found = 0
     exitFlag = 0
-    if args.get('--camera') == 1:
-        cap = cv.VideoCapture(0)
-        while(exitFlag <= 0):
-           ret,img = cap.read()
-           gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+    if args.get('--camera') == '1':
+	print("Camera flag is 1")
+        if args.get('--raspberry') == 0:
+	   print("Raspberry flag is 0")
+           cap = cv.VideoCapture(0)
+	   if cap.isOpened():
+		while(exitFlag <= 0):
+          		ret,img = cap.read()
+           		gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
             
-           if ret:
-              found, corners = cv.findChessboardCorners(gray, pattern_size)
-              [h, w] = gray.shape[:2]
+          		if ret:
+              		   found, corners = cv.findChessboardCorners(gray, pattern_size)
+              		   [h, w] = gray.shape[:2]
 
-           if found:
-               term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
-               cv.cornerSubPix(gray, corners, (5, 5), (-1, -1), term)
-               name = name + 1
-               outfile = os.path.join(debug_dir, str(name) + '_chess.png')
-               cv.imwrite(outfile, img)
-               cv.drawChessboardCorners(img, pattern_size, corners, found)
-               img_points.append(corners)
-               obj_points.append(pattern_points)
+           		if found:
+               		   term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
+               		   cv.cornerSubPix(gray, corners, (5, 5), (-1, -1), term)
+               		   name = name + 1
+               		   outfile = os.path.join(debug_dir, str(name) + '_chess.png')
+               		   cv.imwrite(outfile, img)
+               		   cv.drawChessboardCorners(img, pattern_size, corners, found)
+	  	           img_points.append(corners)
+		           obj_points.append(pattern_points)
 
-           cv.imshow('image',img)
-           exitFlag = cv.waitKey(1)
-        cv.destroyAllWindows()
-        cap.release()
+		        cv.imshow('image',img)
+           		exitFlag = cv.waitKey(1)
+	        cv.destroyAllWindows()
+       		cap.release()
+	else:
+	   print("Raspberry flag is ", args.get('--raspberry'))
+	   #initialize the camera and grab a reference to the raw camera capture
+           cap = PiCamera()
+	   cap.resolution = (640, 480)
+	   cap.framerate = 32
+           rawCapture = PiRGBArray(cap, size=(640, 480)) 
+	   # allow the camera to warmup
+	   time.sleep(0.1)
+	   # grab an image from the camera
+	   for frame in cap.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+		# grab the raw NumPy array representing the image, then initialize the timestamp
+		# and occupied/unoccupied text
+		img = frame.array
+		gray = cv.cvtColor(img,cv.COLOR_BGR2GRAY)
+		found, corners = cv.findChessboardCorners(gray, pattern_size)
+		[h, w] = gray.shape[:2]
+		if found:
+			term = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_COUNT, 30, 0.1)
+                  	cv.cornerSubPix(gray, corners, (5, 5), (-1, -1), term)
+                	name = name + 1
+                 	outfile = os.path.join(debug_dir, str(name) + '_chess.png')
+                	cv.imwrite(outfile, img)
+                 	cv.drawChessboardCorners(img, pattern_size, corners, found)
+                 	img_points.append(corners)
+                 	obj_points.append(pattern_points)
+
+		# show the frame
+		cv.imshow("Frame", img)
+		key = cv.waitKey(1) & 0xFF
+ 
+		# clear the stream in preparation for the next frame
+		rawCapture.truncate(0)
+ 
+		# if the `q` key was pressed, break from the loop
+		if key == ord("q"):
+			cv.destroyAllWindows()	
+			break
+
     else:
        for fn in img_names if debug_dir else []:
          print(fn)
@@ -102,7 +152,6 @@ if __name__ == '__main__':
                 img_points.append(corners)
                 obj_points.append(pattern_points)
 
-    print("Exited loop with ",exitFlag)
     # calculate camera distortion
     if obj_points:
         print("Processing image points\n")
@@ -112,16 +161,16 @@ if __name__ == '__main__':
         print("camera matrix:\n", camera_matrix)
         print("distortion coefficients: ", dist_coefs.ravel())
         
-    cap = cv.VideoCapture(0)
-    exitFlag = 0
-    while(exitFlag <= 0):
-        ret,img = cap.read()
+   # cap = cv.VideoCapture(0)
+   # exitFlag = 0
+   # while(exitFlag <= 0):
+   #     ret,img = cap.read()
             
-        if ret:
-            dst = cv.undistort(img, camera_matrix, dist_coefs)
-            cv.imshow('original',img)
-            cv.imshow('undistorted',dst)
-            exitFlag = cv.waitKey(1)
+   #     if ret:
+   #         dst = cv.undistort(img, camera_matrix, dist_coefs)
+   #         cv.imshow('original',img)
+   #         cv.imshow('undistorted',dst)
+   #         exitFlag = cv.waitKey(1)
        
-    cv.destroyAllWindows()
-    cap.release()
+   # cv.destroyAllWindows()
+   # cap.release()
